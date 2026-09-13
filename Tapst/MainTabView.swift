@@ -14,7 +14,7 @@ struct MainTabView: View {
     var body: some View {
         TabView {
             ContentView()
-                .tabItem { Label("할일", systemImage: "checklist") }
+                .tabItem { Label("할일", systemImage: "note.text") }
 
             SettingsView()
                 .tabItem { Label("설정", systemImage: "gearshape") }

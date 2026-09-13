@@ -112,6 +112,7 @@ struct TapstActivityAttributes: ActivityAttributes {
         var fontBold: Bool = false
         var textScale: Double = 1.0
         var limit: Int = 5
+        var hideDynamicIsland: Bool = false
     }
 }
 
@@ -125,7 +126,8 @@ extension TapstActivityAttributes.ContentState {
             fontDesignRaw: TapstStorage.fontDesignRaw,
             fontBold: TapstStorage.fontBold,
             textScale: TapstStorage.textScale,
-            limit: TapstStorage.lockScreenLimit
+            limit: TapstStorage.lockScreenLimit,
+            hideDynamicIsland: TapstStorage.hideDynamicIsland
         )
     }
 }
@@ -138,9 +140,9 @@ enum TapstStorage {
     static let appGroupID = "group.com.carryHoon.Tapst"
     private static let key = "tapst.tasks"
 
-    private static var defaults: UserDefaults {
-        UserDefaults(suiteName: appGroupID) ?? .standard
-    }
+    // Single instance — computed property caused different UserDefaults objects
+    // to be created on each access, which could miss in-progress writes.
+    static let defaults: UserDefaults = UserDefaults(suiteName: appGroupID) ?? .standard
 
     static func load() -> [TapstTask] {
         guard let data = defaults.data(forKey: key),
@@ -220,6 +222,20 @@ enum TapstStorage {
         get { defaults.object(forKey: "tapst.fontBold") as? Bool ?? false }
         set { defaults.set(newValue, forKey: "tapst.fontBold") }
     }
+
+    // MARK: Convenience (Basic — free)
+
+    /// Hides custom content in the Dynamic Island compact/minimal presentation.
+    static var hideDynamicIsland: Bool {
+        get { defaults.object(forKey: "tapst.hideDynamicIsland") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "tapst.hideDynamicIsland") }
+    }
+
+    /// Ends the Live Activity automatically when the task list becomes empty.
+    static var hideWhenEmpty: Bool {
+        get { defaults.object(forKey: "tapst.hideWhenEmpty") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: "tapst.hideWhenEmpty") }
+    }
 }
 
 // MARK: - Live Activity manager
@@ -237,7 +253,14 @@ enum TapstLiveActivity {
         let tasks = TapstStorage.load()
         let activities = Activity<TapstActivityAttributes>.activities
         let enabled = ActivityAuthorizationInfo().areActivitiesEnabled
-        print("TAPST_LA: refresh tasks=\(tasks.count) running=\(activities.count) enabled=\(enabled)")
+
+        // '할 일이 없으면 숨기기' — end the Live Activity immediately when empty.
+        if tasks.isEmpty && TapstStorage.hideWhenEmpty {
+            for activity in activities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+            return
+        }
 
         let content = ActivityContent(
             state: TapstActivityAttributes.ContentState.current(tasks: tasks),
@@ -246,21 +269,14 @@ enum TapstLiveActivity {
 
         if let existing = activities.first {
             await existing.update(content)
-            print("TAPST_LA: updated id=\(existing.id) -> \(tasks.count) tasks")
         } else {
-            guard enabled else {
-                print("TAPST_LA: activities NOT enabled — check Settings and NSSupportsLiveActivities")
-                return
-            }
+            guard enabled else { return }
             do {
-                let activity = try Activity.request(
+                let _ = try Activity.request(
                     attributes: TapstActivityAttributes(),
                     content: content
                 )
-                print("TAPST_LA: started id=\(activity.id)")
             } catch {
-                // Starting fails from the background; the foreground call will
-                // establish the activity on next app launch.
                 print("TAPST_LA: request failed: \(error)")
             }
         }

@@ -17,6 +17,8 @@ struct OnboardingView: View {
     @State private var selected: GuideTopic?
     @FocusState private var inputFocused: Bool
 
+    private let accent = Color(red: 0.36, green: 0.56, blue: 0.98)
+
     private var savedMemo: String {
         let t = memo.trimmingCharacters(in: .whitespacesAndNewlines)
         return t.isEmpty ? "헬스 가기" : t
@@ -131,7 +133,7 @@ struct OnboardingView: View {
     private var methodStep: some View {
         VStack(alignment: .leading, spacing: 22) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("메모탭 200% 활용하기")
+                Text("메모탭 이렇게 활용하세요")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(.primary)
                 Text("앱을 켜지 않고도 추가할 수 있어요.")
@@ -182,8 +184,8 @@ struct OnboardingView: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(.primary, in: Capsule())
-                .foregroundStyle(Color(.systemBackground))
+                .background(accent, in: Capsule())
+                .foregroundStyle(.white)
         }
         .opacity(step == 0 && memo.trimmingCharacters(in: .whitespaces).isEmpty ? 0.4 : 1)
         .disabled(step == 0 && memo.trimmingCharacters(in: .whitespaces).isEmpty)

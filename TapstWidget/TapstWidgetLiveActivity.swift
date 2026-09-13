@@ -55,11 +55,17 @@ struct TapstWidgetLiveActivity: Widget {
                     TapstChecklistView(state: context.state)
                 }
             } compactLeading: {
-                Image(systemName: "checklist")
+                if !context.state.hideDynamicIsland {
+                    Image(systemName: "checklist")
+                }
             } compactTrailing: {
-                Text("\(context.state.tasks.count)").fontWeight(.semibold)
+                if !context.state.hideDynamicIsland {
+                    Text("\(context.state.tasks.count)").fontWeight(.semibold)
+                }
             } minimal: {
-                Text("\(context.state.tasks.count)")
+                if !context.state.hideDynamicIsland {
+                    Text("\(context.state.tasks.count)")
+                }
             }
         }
     }

@@ -24,6 +24,11 @@ struct SettingsView: View {
                     } label: {
                         Label("디자인", systemImage: "paintbrush.pointed.fill")
                     }
+                    NavigationLink {
+                        ConvenienceSettingsView()
+                    } label: {
+                        Label("편의설정", systemImage: "slider.horizontal.3")
+                    }
                 }
 
                 Section("도움말") {
@@ -63,6 +68,38 @@ struct SettingsView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Convenience Settings
+
+struct ConvenienceSettingsView: View {
+    @State private var hideDynamicIsland: Bool = TapstStorage.hideDynamicIsland
+    @State private var hideWhenEmpty: Bool = TapstStorage.hideWhenEmpty
+
+    var body: some View {
+        List {
+            Section {
+                Toggle("다이나믹 아일랜드 숨기기", isOn: $hideDynamicIsland)
+                    .onChange(of: hideDynamicIsland) { _, v in
+                        TapstStorage.hideDynamicIsland = v
+                        Task { await TapstLiveActivity.refresh() }
+                    }
+                Toggle("할 일이 없으면 숨기기", isOn: $hideWhenEmpty)
+                    .onChange(of: hideWhenEmpty) { _, v in
+                        TapstStorage.hideWhenEmpty = v
+                        Task { await TapstLiveActivity.refresh() }
+                    }
+            } footer: {
+                Text("'할 일이 없으면 숨기기'를 켜면 모든 메모를 완료했을 때 잠금화면 카드가 자동으로 사라져요.")
+            }
+        }
+        .onAppear {
+            hideDynamicIsland = TapstStorage.hideDynamicIsland
+            hideWhenEmpty = TapstStorage.hideWhenEmpty
+        }
+        .navigationTitle("편의설정")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

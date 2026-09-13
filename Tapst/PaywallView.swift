@@ -47,6 +47,7 @@ struct PaywallView: View {
                     }
                 }
                 .padding(.horizontal, 20)
+                .padding(.top, 14)
                 Spacer()
                 bottomBar
             }

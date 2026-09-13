@@ -25,8 +25,8 @@ enum GuideTopic: String, Identifiable, CaseIterable {
 
     var subtitle: String {
         switch self {
-        case .tap: return "아이폰 뒷면을 두 번 탭해서 바로 적기"
-        case .shortcut: return "잠금화면 단축키를 눌러 바로 적기"
+        case .tap: return "아이폰 뒷면을 두 번 탭해서 바로 메모"
+        case .shortcut: return "잠금화면 단축키를 눌러 바로 메모"
         }
     }
 
@@ -166,12 +166,13 @@ struct GuideDetailView: View {
     @ViewBuilder
     private var demoVideo: some View {
         if let url = Bundle.main.url(forResource: topic.videoName, withExtension: "mov") {
-            // Dark card with the full video fit inside (letterboxed, never cropped).
+            // Black card; player is constrained to exact 1170:2532 ratio so
+            // SwiftUI gives the UIView precise bounds — guarantees no crop.
             ZStack {
                 Color.black
-                // Size the player to the EXACT video ratio (540:1170) so it can
-                // never be cropped, centered on the black card (letterbox).
                 LoopingVideoPlayer(url: url)
+                    .aspectRatio(CGSize(width: 1170, height: 2532), contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: 440)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 440)
@@ -206,23 +207,28 @@ struct LoopingVideoPlayer: UIViewRepresentable {
 }
 
 final class LoopingPlayerUIView: UIView {
-    // Make the view's backing layer the AVPlayerLayer so it always tracks the
-    // view's bounds and honors videoGravity (fixes the earlier crop issue where
-    // a manually-sized sublayer filled instead of fitting).
-    override static var layerClass: AnyClass { AVPlayerLayer.self }
-    private var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
-
+    private let playerLayer = AVPlayerLayer()
     private let queuePlayer = AVQueuePlayer()
     private var looper: AVPlayerLooper?
 
     init(url: URL) {
         super.init(frame: .zero)
+        layer.addSublayer(playerLayer)
         let item = AVPlayerItem(url: url)
         looper = AVPlayerLooper(player: queuePlayer, templateItem: item)
         queuePlayer.isMuted = true
         playerLayer.player = queuePlayer
-        playerLayer.videoGravity = .resizeAspect   // fit whole frame, never crop
+        playerLayer.videoGravity = .resizeAspect
         queuePlayer.play()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // Disable implicit CALayer animation so the frame snaps instantly.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        playerLayer.frame = bounds
+        CATransaction.commit()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }

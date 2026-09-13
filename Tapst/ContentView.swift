@@ -74,7 +74,7 @@ struct ContentView: View {
 
     private var emptyState: some View {
         VStack(spacing: 12) {
-            Image(systemName: "checklist")
+            Image(systemName: "note.text")
                 .font(.system(size: 44))
                 .foregroundStyle(.secondary)
             Text("아직 할 일이 없어요")

@@ -66,7 +66,7 @@ struct DesignSettingsView: View {
             } header: {
                 proHeader("테마 색상")
             } footer: {
-                if !store.isPro { Text("테마 색상은 메모탭 프로 전용이에요.") }
+                if !store.isPro { Text("테마 색상은 메모탭 Pro 전용이에요.") }
             }
 
             // Text color — Pro.
@@ -91,7 +91,7 @@ struct DesignSettingsView: View {
             } header: {
                 proHeader("텍스트 색상")
             } footer: {
-                if !store.isPro { Text("텍스트 색상은 메모탭 프로 전용이에요.") }
+                if !store.isPro { Text("텍스트 색상은 메모탭 Pro 전용이에요.") }
             }
 
             // Font — Pro.
@@ -114,6 +114,7 @@ struct DesignSettingsView: View {
             .disabled(!store.isPro)
             .opacity(store.isPro ? 1 : 0.5)
         }
+        .onAppear { reloadFromStorage() }
         .navigationTitle("디자인")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showPaywall) { PaywallView() }
@@ -169,6 +170,14 @@ struct DesignSettingsView: View {
         fontBold = TapstStorage.fontBold
         showPaywall = true
         return false
+    }
+
+    private func reloadFromStorage() {
+        textScale = TapstStorage.textScale
+        themeColorID = TapstStorage.themeColorID
+        textColorID = TapstStorage.textColorID
+        fontDesign = TapstStorage.fontDesignRaw
+        fontBold = TapstStorage.fontBold
     }
 
     private func apply() {
