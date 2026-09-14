@@ -74,11 +74,36 @@ struct SettingsView: View {
 // MARK: - Convenience Settings
 
 struct ConvenienceSettingsView: View {
+    @State private var store = ProStore.shared
     @State private var hideDynamicIsland: Bool = TapstStorage.hideDynamicIsland
     @State private var hideWhenEmpty: Bool = TapstStorage.hideWhenEmpty
+    @State private var cardMode: String = TapstStorage.lockScreenCardMode
+    @State private var showPaywall = false
 
     var body: some View {
         List {
+            // Which card the Lock Screen shows — 시간표 is Pro.
+            Section {
+                Picker("잠금화면 카드", selection: $cardMode) {
+                    Text("할일").tag("tasks")
+                    Text("시간표").tag("schedule")
+                }
+                .onChange(of: cardMode) { _, v in
+                    // 시간표 requires Pro; otherwise revert and offer the paywall.
+                    if v == "schedule" && !store.isPro {
+                        cardMode = "tasks"
+                        showPaywall = true
+                        return
+                    }
+                    TapstStorage.lockScreenCardMode = v
+                    Task { await TapstLiveActivity.refresh() }
+                }
+            } header: {
+                Text("잠금화면 카드")
+            } footer: {
+                Text("잠금화면에 표시할 카드를 선택해요. 시간표는 메모탭 Pro 전용이에요.")
+            }
+
             Section {
                 Toggle("다이나믹 아일랜드 숨기기", isOn: $hideDynamicIsland)
                     .onChange(of: hideDynamicIsland) { _, v in
@@ -91,15 +116,17 @@ struct ConvenienceSettingsView: View {
                         Task { await TapstLiveActivity.refresh() }
                     }
             } footer: {
-                Text("'할 일이 없으면 숨기기'를 켜면 모든 메모를 완료했을 때 잠금화면 카드가 자동으로 사라져요.")
+                Text("'할 일이 없으면 숨기기'를 켜면 카드 내용이 모두 비었을 때 잠금화면 카드가 자동으로 사라져요.")
             }
         }
         .onAppear {
             hideDynamicIsland = TapstStorage.hideDynamicIsland
             hideWhenEmpty = TapstStorage.hideWhenEmpty
+            cardMode = TapstStorage.lockScreenCardMode
         }
         .navigationTitle("편의설정")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showPaywall) { PaywallView() }
     }
 }
 

@@ -84,6 +84,14 @@ enum TapstDesignKit {
     }
 }
 
+// MARK: - Timetable time formatting (shared with the widget)
+
+/// Zero-padded 24-hour "HH:mm" used for the timetable's fixed time column in both
+/// the app and the Lock Screen card, so the time/text split looks consistent.
+func tapstTimeString(hour: Int, minute: Int) -> String {
+    String(format: "%02d:%02d", hour, minute)
+}
+
 // MARK: - Model
 
 /// A single Tapst task entered by the user.
@@ -97,6 +105,41 @@ struct TapstTask: Identifiable, Codable, Hashable {
         self.text = text
         self.createdAt = createdAt
     }
+}
+
+/// A single timetable entry: what to do and at what time of day (Pro feature).
+/// Completely independent from `TapstTask` — a different workflow/store.
+struct TapstScheduleItem: Identifiable, Codable, Hashable {
+    let id: UUID
+    var text: String
+    var hour: Int    // 0...23
+    var minute: Int  // 0...59
+    var weekday: Int // 1=Sun ... 7=Sat (matches Calendar.component(.weekday))
+    let createdAt: Date // used to resolve a non-recurring item's single occurrence
+
+    init(id: UUID = UUID(), text: String, hour: Int, minute: Int, weekday: Int, createdAt: Date = Date()) {
+        self.id = id
+        self.text = text
+        self.hour = hour
+        self.minute = minute
+        self.weekday = weekday
+        self.createdAt = createdAt
+    }
+
+    // Tolerant decode: items saved before these fields existed default gracefully
+    // instead of dropping the whole saved list.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        text = try c.decode(String.self, forKey: .text)
+        hour = try c.decode(Int.self, forKey: .hour)
+        minute = try c.decode(Int.self, forKey: .minute)
+        weekday = try c.decodeIfPresent(Int.self, forKey: .weekday) ?? 2
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+    }
+
+    /// Minutes since midnight — used for chronological sorting.
+    var minutesOfDay: Int { hour * 60 + minute }
 }
 
 // MARK: - Live Activity attributes
@@ -113,6 +156,13 @@ struct TapstActivityAttributes: ActivityAttributes {
         var textScale: Double = 1.0
         var limit: Int = 5
         var hideDynamicIsland: Bool = false
+        // Which card the Lock Screen shows: "tasks" (default, free) or "schedule"
+        // (Pro timetable). Additive with defaults so existing behavior is unchanged.
+        var mode: String = "tasks"
+        // Full timetable (all weekdays) + which weekdays are enabled for the Lock
+        // Screen. The widget filters by *today's* weekday so it flips at midnight.
+        var schedule: [TapstScheduleItem] = []
+        var scheduleWeekdays: [Int] = []
     }
 }
 
@@ -127,7 +177,10 @@ extension TapstActivityAttributes.ContentState {
             fontBold: TapstStorage.fontBold,
             textScale: TapstStorage.textScale,
             limit: TapstStorage.lockScreenLimit,
-            hideDynamicIsland: TapstStorage.hideDynamicIsland
+            hideDynamicIsland: TapstStorage.hideDynamicIsland,
+            mode: TapstStorage.lockScreenCardMode,
+            schedule: TapstStorage.loadSchedule(),
+            scheduleWeekdays: TapstStorage.scheduleWeekdays
         )
     }
 }
@@ -177,6 +230,137 @@ enum TapstStorage {
         tasks.removeAll { $0.id.uuidString == id }
         save(tasks)
         return tasks
+    }
+
+    /// Edits an existing memo's text (in-app tap-to-edit). Empty text is ignored.
+    @discardableResult
+    static func updateText(id: String, text: String) -> [TapstTask] {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var tasks = load()
+        guard !trimmed.isEmpty, let i = tasks.firstIndex(where: { $0.id.uuidString == id }) else { return tasks }
+        tasks[i].text = trimmed
+        save(tasks)
+        return tasks
+    }
+
+    // MARK: Timetable (schedule) — independent store, Pro-only
+
+    private static let scheduleKey = "tapst.schedule"
+
+    /// Max timetable rows PER WEEKDAY kept legible on the Lock Screen. Announced
+    /// to users as the cap.
+    static let maxScheduleItems = 5
+
+    private static let scheduleWeekdaysKey = "tapst.scheduleWeekdays"
+
+    static func loadSchedule() -> [TapstScheduleItem] {
+        guard let data = defaults.data(forKey: scheduleKey),
+              let decoded = try? JSONDecoder().decode([TapstScheduleItem].self, from: data) else {
+            return []
+        }
+        return decoded
+    }
+
+    static func saveSchedule(_ items: [TapstScheduleItem]) {
+        guard let data = try? JSONEncoder().encode(items) else { return }
+        defaults.set(data, forKey: scheduleKey)
+    }
+
+    static func scheduleItems(weekday: Int) -> [TapstScheduleItem] {
+        loadSchedule().filter { $0.weekday == weekday }.sorted { $0.minutesOfDay < $1.minutesOfDay }
+    }
+
+    static func canAddSchedule(weekday: Int) -> Bool {
+        loadSchedule().filter { $0.weekday == weekday }.count < maxScheduleItems
+    }
+
+    @discardableResult
+    static func addSchedule(text: String, hour: Int, minute: Int, weekday: Int) -> [TapstScheduleItem] {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var items = loadSchedule()
+        let dayCount = items.filter { $0.weekday == weekday }.count
+        guard !trimmed.isEmpty, dayCount < maxScheduleItems else { return items }
+        items.append(TapstScheduleItem(text: trimmed, hour: hour, minute: minute, weekday: weekday))
+        saveSchedule(items)
+        return items
+    }
+
+    /// Weekdays (1=Sun...7=Sat) enabled to show their timetable on the Lock Screen.
+    static var scheduleWeekdays: [Int] {
+        get { (defaults.array(forKey: scheduleWeekdaysKey) as? [Int]) ?? [] }
+        set { defaults.set(newValue.sorted(), forKey: scheduleWeekdaysKey) }
+    }
+
+    /// The calendar day a non-recurring item is meant for: the first occurrence of
+    /// its weekday on or after it was created.
+    static func scheduledOccurrence(for item: TapstScheduleItem) -> Date {
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: item.createdAt)
+        let cur = cal.component(.weekday, from: start)
+        let delta = (item.weekday - cur + 7) % 7
+        return cal.date(byAdding: .day, value: delta, to: start) ?? start
+    }
+
+    /// Rows shown on the Lock Screen *today*, from an explicit list (used by the
+    /// widget with ContentState). Recurring weekdays (toggle ON) always show; a
+    /// non-recurring (toggle OFF) item shows only on its own single occurrence day.
+    static func lockScreenScheduleItems(from all: [TapstScheduleItem],
+                                        enabled: [Int],
+                                        now: Date = Date()) -> [TapstScheduleItem] {
+        let cal = Calendar.current
+        let today = cal.component(.weekday, from: now)
+        let recurringToday = enabled.contains(today)
+        return all
+            .filter { item in
+                guard item.weekday == today else { return false }
+                if recurringToday { return true }
+                return cal.isDate(scheduledOccurrence(for: item), inSameDayAs: now)
+            }
+            .sorted { $0.minutesOfDay < $1.minutesOfDay }
+    }
+
+    /// Storage-backed convenience (app side).
+    static func lockScreenScheduleItems(now: Date = Date()) -> [TapstScheduleItem] {
+        lockScreenScheduleItems(from: loadSchedule(), enabled: scheduleWeekdays, now: now)
+    }
+
+    /// Removes non-recurring (toggle OFF) items whose single occurrence day has
+    /// passed. Called from the app; recurring items are never purged.
+    @discardableResult
+    static func purgeExpiredSchedule(now: Date = Date()) -> [TapstScheduleItem] {
+        let cal = Calendar.current
+        let enabled = Set(scheduleWeekdays)
+        var items = loadSchedule()
+        let before = items.count
+        items.removeAll { item in
+            guard !enabled.contains(item.weekday) else { return false } // recurring stays
+            return cal.startOfDay(for: now) > scheduledOccurrence(for: item)
+        }
+        if items.count != before { saveSchedule(items) }
+        return items
+    }
+
+    @discardableResult
+    static func removeSchedule(id: String) -> [TapstScheduleItem] {
+        var items = loadSchedule()
+        items.removeAll { $0.id.uuidString == id }
+        saveSchedule(items)
+        return items
+    }
+
+    /// Edits an existing timetable item's text and/or time (in-app tap-to-edit).
+    @discardableResult
+    static func updateSchedule(id: String, text: String? = nil, hour: Int? = nil, minute: Int? = nil) -> [TapstScheduleItem] {
+        var items = loadSchedule()
+        guard let i = items.firstIndex(where: { $0.id.uuidString == id }) else { return items }
+        if let text {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { items[i].text = trimmed }
+        }
+        if let hour { items[i].hour = hour }
+        if let minute { items[i].minute = minute }
+        saveSchedule(items)
+        return items
     }
 
     /// MemoTap Pro entitlement, shared with the widget.
@@ -236,6 +420,16 @@ enum TapstStorage {
         get { defaults.object(forKey: "tapst.hideWhenEmpty") as? Bool ?? false }
         set { defaults.set(newValue, forKey: "tapst.hideWhenEmpty") }
     }
+
+    /// Which card the Lock Screen shows: "tasks" (default, free) or "schedule"
+    /// (Pro timetable). Falls back to "tasks" if the user isn't Pro.
+    static var lockScreenCardMode: String {
+        get {
+            let raw = defaults.string(forKey: "tapst.cardMode") ?? "tasks"
+            return (raw == "schedule" && isPro) ? "schedule" : "tasks"
+        }
+        set { defaults.set(newValue, forKey: "tapst.cardMode") }
+    }
 }
 
 // MARK: - Live Activity manager
@@ -254,8 +448,13 @@ enum TapstLiveActivity {
         let activities = Activity<TapstActivityAttributes>.activities
         let enabled = ActivityAuthorizationInfo().areActivitiesEnabled
 
+        // The active card decides what "empty" means (tasks vs today's timetable).
+        let isEmpty = TapstStorage.lockScreenCardMode == "schedule"
+            ? TapstStorage.lockScreenScheduleItems().isEmpty
+            : tasks.isEmpty
+
         // '할 일이 없으면 숨기기' — end the Live Activity immediately when empty.
-        if tasks.isEmpty && TapstStorage.hideWhenEmpty {
+        if isEmpty && TapstStorage.hideWhenEmpty {
             for activity in activities {
                 await activity.end(nil, dismissalPolicy: .immediate)
             }

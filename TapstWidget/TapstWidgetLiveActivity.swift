@@ -88,6 +88,17 @@ struct TapstChecklistView: View {
     }
 
     var body: some View {
+        // Timetable (Pro) and the task checklist are fully independent layouts.
+        if state.mode == "schedule" {
+            scheduleContent
+        } else {
+            taskContent
+        }
+    }
+
+    // MARK: Tasks (unchanged behavior)
+
+    private var taskContent: some View {
         VStack(alignment: .leading, spacing: metrics.spacing) {
             if tasks.isEmpty {
                 emptyRow
@@ -119,6 +130,62 @@ struct TapstChecklistView: View {
                 .font(memoFont)
                 .foregroundStyle(textColor.opacity(0.6))
                 .lineLimit(1)
+        }
+    }
+
+    // MARK: Timetable (Pro) — digital time column + text, chronological
+
+    /// A fixed-width time column keeps the time/text split perfectly aligned across
+    /// every row; a thin divider makes the two zones unmistakable. Capped at
+    /// TapstStorage.maxScheduleItems so all rows stay legible at full size.
+    private var scheduleContent: some View {
+        let s = CGFloat(state.textScale)
+        let timeSize = 17 * s
+        let textSize = 19 * s
+        let timeCol = 64 * s
+        let font = TapstDesignKit.memoFont(state.fontDesignRaw, size: textSize, bold: state.fontBold)
+        // Show *today's* items, computed at render so the card flips at midnight.
+        // Independent of the toggle: recurring weekdays always show, and a one-time
+        // (toggle-off) entry still shows on its own occurrence day.
+        let items = TapstStorage.lockScreenScheduleItems(from: state.schedule,
+                                                         enabled: state.scheduleWeekdays)
+
+        return VStack(alignment: .leading, spacing: 14 * s) {
+            if items.isEmpty {
+                scheduleRow(time: "--:--", text: "오늘 시간표가 없어요",
+                            timeCol: timeCol, timeSize: timeSize, textSize: textSize,
+                            font: font, dim: true)
+            } else {
+                ForEach(items) { item in
+                    scheduleRow(time: tapstTimeString(hour: item.hour, minute: item.minute),
+                                text: item.text,
+                                timeCol: timeCol, timeSize: timeSize, textSize: textSize,
+                                font: font, dim: false)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, TapstDesign.hPadding)
+        .padding(.vertical, 14)
+    }
+
+    private func scheduleRow(time: String, text: String, timeCol: CGFloat,
+                             timeSize: CGFloat, textSize: CGFloat, font: Font, dim: Bool) -> some View {
+        HStack(spacing: 0) {
+            Text(time)
+                .font(.system(size: timeSize, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(textColor.opacity(dim ? 0.5 : 1))
+                .frame(width: timeCol, alignment: .leading)
+            Rectangle()
+                .fill(textColor.opacity(0.25))
+                .frame(width: 1, height: textSize * 1.1)
+                .padding(.trailing, 12)
+            Text(text)
+                .font(font)
+                .foregroundStyle(textColor.opacity(dim ? 0.6 : 1))
+                .lineLimit(1)
+            Spacer(minLength: 0)
         }
     }
 }

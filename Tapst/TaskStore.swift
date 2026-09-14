@@ -33,4 +33,10 @@ final class TaskStore {
         reload()
         Task { await TapstLiveActivity.refresh() }
     }
+
+    func updateText(_ task: TapstTask, to text: String) {
+        TapstStorage.updateText(id: task.id.uuidString, text: text)
+        reload()
+        Task { await TapstLiveActivity.refresh() }
+    }
 }

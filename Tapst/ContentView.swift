@@ -13,6 +13,10 @@ struct ContentView: View {
     @State private var draft = ""
     @State private var showPaywall = false
     @FocusState private var inputFocused: Bool
+    // Tap-to-edit an existing memo's text inline.
+    @State private var editingID: UUID?
+    @State private var editText = ""
+    @FocusState private var editFocused: Bool
 
     var body: some View {
         ZStack {
@@ -93,27 +97,57 @@ struct ContentView: View {
         ScrollView {
             VStack(spacing: 12) {
                 ForEach(store.tasks) { task in
-                    Button {
-                        withAnimation(.snappy) { store.remove(task) }
-                    } label: {
-                        HStack(spacing: 16) {
+                    HStack(spacing: 16) {
+                        // Circle = complete/remove (unchanged behavior).
+                        Button {
+                            withAnimation(.snappy) { store.remove(task) }
+                        } label: {
                             Circle()
                                 .strokeBorder(.primary.opacity(0.85), lineWidth: 2.5)
                                 .frame(width: 28, height: 28)
+                        }
+                        .buttonStyle(.plain)
+
+                        // Text = tap to edit inline (keyboard).
+                        if editingID == task.id {
+                            TextField("", text: $editText)
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .focused($editFocused)
+                                .submitLabel(.done)
+                                .onSubmit { commitEditing() }
+                                .onAppear { editFocused = true }
+                                .onChange(of: editFocused) { _, focused in
+                                    if !focused { commitEditing() }
+                                }
+                        } else {
                             Text(task.text)
                                 .font(.system(size: 22, weight: .semibold))
                                 .foregroundStyle(.primary)
-                            Spacer(minLength: 0)
+                                .onTapGesture { startEditing(task) }
                         }
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 16)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
+                        Spacer(minLength: 0)
                     }
-                    .buttonStyle(.plain)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 16)
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
                 }
             }
         }
         .scrollIndicators(.hidden)
+    }
+
+    private func startEditing(_ task: TapstTask) {
+        commitEditing() // save any row already being edited
+        editText = task.text
+        editingID = task.id
+    }
+
+    private func commitEditing() {
+        guard let id = editingID,
+              let task = store.tasks.first(where: { $0.id == id }) else { return }
+        editingID = nil
+        store.updateText(task, to: editText)
     }
 
     private func addDraft() {
