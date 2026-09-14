@@ -17,6 +17,7 @@ struct PaywallView: View {
     private let accent = Color(red: 0.36, green: 0.56, blue: 0.98)
     private let features: [(icon: String, text: String)] = [
         ("infinity", "잠금화면 메모 무제한 생성"),
+        ("calendar", "요일별 시간표 잠금화면 표시"),
         ("paintpalette.fill", "다양한 테마 지원 (카드·텍스트 색상)"),
         ("textformat", "글꼴 · 굵기 선택")
     ]
@@ -65,7 +66,7 @@ struct PaywallView: View {
             Text("메모탭 Pro")
                 .font(.system(size: 30, weight: .bold))
                 .foregroundStyle(.primary)
-            Text("메모를 무제한으로, 나만의 스타일로.")
+            Text("메모 무제한, 요일별 시간표, 나만의 스타일로.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

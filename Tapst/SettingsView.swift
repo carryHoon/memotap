@@ -56,7 +56,7 @@ struct SettingsView: View {
                 Text(store.isPro ? "메모탭 Pro 사용 중" : "메모탭 Pro 업그레이드 하기")
                     .font(.headline)
                     .foregroundStyle(.primary)
-                Text(store.isPro ? "모든 기능이 열려 있어요" : "메모 무제한 · 다양한 테마 ·  다양한 글꼴")
+                Text(store.isPro ? "모든 기능이 열려 있어요" : "메모 무제한 · 요일별 시간표 · 테마 · 글꼴")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
