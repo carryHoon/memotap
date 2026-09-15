@@ -150,23 +150,43 @@ struct TapstChecklistView: View {
         let items = TapstStorage.lockScreenScheduleItems(from: state.schedule,
                                                          enabled: state.scheduleWeekdays)
 
-        return VStack(alignment: .leading, spacing: 14 * s) {
+        // spacing 0: the inter-row gap is provided by the dashed connectors so the
+        // dashes fall exactly between consecutive times (n rows → n-1 connectors).
+        return VStack(alignment: .leading, spacing: 0) {
             if items.isEmpty {
-                scheduleRow(time: "--:--", text: "오늘 시간표가 없어요",
+                scheduleRow(time: "--:--", text: String(localized: "오늘 시간표가 없어요"),
                             timeCol: timeCol, timeSize: timeSize, textSize: textSize,
                             font: font, dim: true)
             } else {
-                ForEach(items) { item in
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     scheduleRow(time: tapstTimeString(hour: item.hour, minute: item.minute),
                                 text: item.text,
                                 timeCol: timeCol, timeSize: timeSize, textSize: textSize,
                                 font: font, dim: false)
+                    // Dashed link in the gap between this time and the next only.
+                    if index < items.count - 1 {
+                        colonConnector(x: timeSize * 1.5, gap: 14 * s, s: s)
+                    }
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, TapstDesign.hPadding)
         .padding(.vertical, 14)
+    }
+
+    /// A short dashed segment sitting in the gap between two consecutive time rows,
+    /// aligned under the colon (~timeSize * 1.5 from the leading edge), so the times
+    /// read as links in one chronological chain with a clean break at each time.
+    private func colonConnector(x: CGFloat, gap: CGFloat, s: CGFloat) -> some View {
+        HStack(spacing: 0) {
+            TapstDashedVLine()
+                .stroke(textColor.opacity(0.35),
+                        style: StrokeStyle(lineWidth: 1, dash: [2 * s, 3 * s]))
+                .frame(width: 1, height: gap)
+                .offset(x: x)
+            Spacer(minLength: 0)
+        }
     }
 
     private func scheduleRow(time: String, text: String, timeCol: CGFloat,
@@ -187,6 +207,17 @@ struct TapstChecklistView: View {
                 .lineLimit(1)
             Spacer(minLength: 0)
         }
+    }
+}
+
+/// A full-height vertical line, stroked with a dash pattern to form the
+/// timetable's chronological "timeline" spine.
+private struct TapstDashedVLine: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+        return path
     }
 }
 

@@ -21,7 +21,7 @@ struct OnboardingView: View {
 
     private var savedMemo: String {
         let t = memo.trimmingCharacters(in: .whitespacesAndNewlines)
-        return t.isEmpty ? "헬스 가기" : t
+        return t.isEmpty ? String(localized: "헬스 가기") : t
     }
 
     var body: some View {

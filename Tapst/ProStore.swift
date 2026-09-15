@@ -27,9 +27,9 @@ enum ProPlan: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .monthly: return "월 구독"
-        case .yearly: return "연 구독"
-        case .lifetime: return "평생 이용"
+        case .monthly: return String(localized: "월 구독")
+        case .yearly: return String(localized: "연 구독")
+        case .lifetime: return String(localized: "평생 이용")
         }
     }
 
@@ -45,8 +45,8 @@ enum ProPlan: String, CaseIterable, Identifiable {
     var note: String? {
         switch self {
         case .monthly: return nil
-        case .yearly: return "가장 인기 · 월 대비 약 25% 절약"
-        case .lifetime: return "한 번 결제로 평생"
+        case .yearly: return String(localized: "가장 인기 · 월 대비 약 25% 절약")
+        case .lifetime: return String(localized: "한 번 결제로 평생")
         }
     }
 

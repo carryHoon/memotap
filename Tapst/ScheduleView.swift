@@ -29,7 +29,11 @@ struct ScheduleView: View {
     @FocusState private var editFocused: Bool
     @State private var timeEditItem: TapstScheduleItem?
 
-    private let weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"]
+    // Localized weekday symbols from the system calendar (index 0 == Sunday),
+    // so English shows "S M T W T F S" and Korean shows "일 월 화 수 목 금 토".
+    private let weekdayLabels = Calendar.current.veryShortStandaloneWeekdaySymbols
+    // Full localized weekday names for headings ("Sunday" / "일요일").
+    private let weekdayFullNames = Calendar.current.standaloneWeekdaySymbols
 
     private var dayItems: [TapstScheduleItem] { store.items(weekday: selectedWeekday) }
     private var atCapacity: Bool { dayItems.count >= TapstStorage.maxScheduleItems }
@@ -183,7 +187,7 @@ struct ScheduleView: View {
             Image(systemName: "clock.badge.checkmark")
                 .font(.system(size: 44))
                 .foregroundStyle(.secondary)
-            Text("\(weekdayLabels[selectedWeekday - 1])요일 시간표가 비어 있어요")
+            Text("\(weekdayFullNames[selectedWeekday - 1]) 시간표가 비어 있어요")
                 .font(.headline)
                 .foregroundStyle(.primary)
             Text("할 일과 수행할 시간을 입력해\n하루를 시간순으로 정리해보세요.")

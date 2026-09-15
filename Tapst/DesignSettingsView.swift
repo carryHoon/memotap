@@ -97,7 +97,7 @@ struct DesignSettingsView: View {
             // Font — Pro.
             Section {
                 Picker("서체", selection: $fontDesign) {
-                    ForEach(fontDesigns, id: \.id) { Text($0.name).tag($0.id) }
+                    ForEach(fontDesigns, id: \.id) { Text(LocalizedStringKey($0.name)).tag($0.id) }
                 }
                 .onChange(of: fontDesign) { _, v in
                     guard gateProChange() else { return }
@@ -120,7 +120,7 @@ struct DesignSettingsView: View {
         .sheet(isPresented: $showPaywall) { PaywallView() }
     }
 
-    private func proHeader(_ title: String) -> some View {
+    private func proHeader(_ title: LocalizedStringKey) -> some View {
         HStack(spacing: 6) {
             Text(title)
             if !store.isPro {

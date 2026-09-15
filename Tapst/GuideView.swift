@@ -18,15 +18,15 @@ enum GuideTopic: String, Identifiable, CaseIterable {
 
     var title: String {
         switch self {
-        case .tap: return "탭으로 메모하기"
-        case .shortcut: return "단축키로 메모하기"
+        case .tap: return String(localized: "탭으로 메모하기")
+        case .shortcut: return String(localized: "단축키로 메모하기")
         }
     }
 
     var subtitle: String {
         switch self {
-        case .tap: return "아이폰 뒷면을 두 번 탭해서 바로 메모"
-        case .shortcut: return "잠금화면 단축키를 눌러 바로 메모"
+        case .tap: return String(localized: "아이폰 뒷면을 두 번 탭해서 바로 메모")
+        case .shortcut: return String(localized: "잠금화면 단축키를 눌러 바로 메모")
         }
     }
 
@@ -39,18 +39,26 @@ enum GuideTopic: String, Identifiable, CaseIterable {
 
     /// The two-line headline at the top of the detail sheet.
     var headline: String {
-        switch self {
-        case .tap: return "가이드 [문의하기](mailto:marcap.official@gmail.com)\n24시간 365일 열려있어요!"
-        case .shortcut: return "가이드 [문의하기](mailto:marcap.official@gmail.com)\n24시간 365일 열려있어요!"
-        }
+        // Same headline for both topics; localized via the string catalog.
+        String(localized: "가이드 [문의하기](mailto:marcap.official@gmail.com)\n24시간 365일 열려있어요!")
     }
 
-    /// Bundled demo clip for this guide.
+    /// Bundled demo clip for this guide. Prefers a language-specific clip
+    /// (e.g. "guide_tap_en") when one is bundled, falling back to the base clip.
     var videoName: String {
+        let base: String
         switch self {
-        case .tap: return "guide_tap"
-        case .shortcut: return "guide_shortcut"
+        case .tap: base = "guide_tap"
+        case .shortcut: base = "guide_shortcut"
         }
+        // If the device's language has a matching localized clip, use it.
+        if let lang = Locale.current.language.languageCode?.identifier {
+            let localized = "\(base)_\(lang)"
+            if Bundle.main.url(forResource: localized, withExtension: "mov") != nil {
+                return localized
+            }
+        }
+        return base
     }
 
     /// Numbered setup steps the user performs on their iPhone.
@@ -58,14 +66,14 @@ enum GuideTopic: String, Identifiable, CaseIterable {
         switch self {
         case .tap:
             return [
-                "단축어 앱에서 ‘+’를 클릭하고 ‘Add memo’를 추가해요.",
-                "'설정 › 손쉬운 사용 › 터치 › 뒷면 탭 › 두 번 탭'에서 방금 만든 단축어 Add memo를 선택해요."
+                String(localized: "단축어 앱에서 ‘+’를 클릭하고 ‘Add memo’를 추가해요."),
+                String(localized: "'설정 › 손쉬운 사용 › 터치 › 뒷면 탭 › 두 번 탭'에서 방금 만든 단축어 Add memo를 선택해요.")
             ]
         case .shortcut:
             return [
-                "잠금화면을 길게 누르고 하단의 사용자화를 클릭해요.",
-                "상단의 제어 항목 검색에서 ‘단축어 실행’을 입력 후 선택을 클릭해요.",
-                "상단의 단축어 검색에서 ’메모탭’을 입력하고 '할 일 추가'를 선택해요. 우측 상단의 완료를 클릭해요."
+                String(localized: "잠금화면을 길게 누르고 하단의 사용자화를 클릭해요."),
+                String(localized: "상단의 제어 항목 검색에서 ‘단축어 실행’을 입력 후 선택을 클릭해요."),
+                String(localized: "상단의 단축어 검색에서 ’메모탭’을 입력하고 '할 일 추가'를 선택해요. 우측 상단의 완료를 클릭해요.")
             ]
         }
     }
