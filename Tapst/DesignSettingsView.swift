@@ -2,8 +2,9 @@
 //  DesignSettingsView.swift
 //  Tapst (MemoTap)
 //
-//  Lock Screen card appearance. Text size is free (Basic); theme color and font
-//  are MemoTap Pro. Changes persist to shared storage and refresh the card.
+//  Lock Screen card appearance. Text size, check-mark size, and check-mark shape
+//  are free (Basic); theme color and font are MemoTap Pro. Changes persist to
+//  shared storage and refresh the card.
 //
 
 import SwiftUI
@@ -13,6 +14,8 @@ struct DesignSettingsView: View {
     @State private var showPaywall = false
 
     @State private var textScale: Double = TapstStorage.textScale
+    @State private var markScale: Double = TapstStorage.markScale
+    @State private var markShapeRaw: String = TapstStorage.markShapeRaw
     @State private var themeColorID: String = TapstStorage.themeColorID
     @State private var textColorID: String = TapstStorage.textColorID
     @State private var fontDesign: String = TapstStorage.fontDesignRaw
@@ -41,7 +44,61 @@ struct DesignSettingsView: View {
             } header: {
                 Text("글씨 크기")
             } footer: {
-                Text("잠금화면 카드의 글씨·체크 크기를 조절해요.")
+                Text("잠금화면 카드의 글씨 크기를 조절해요.")
+            }
+
+            // Check-mark size — available to everyone, independent of text size.
+            Section {
+                HStack(spacing: 12) {
+                    Image(systemName: TapstDesignKit.markSymbol(markShapeRaw))
+                        .font(.footnote).foregroundStyle(.secondary)
+                    Slider(value: $markScale, in: 0.6...1.4, step: 0.05)
+                        .onChange(of: markScale) { _, v in
+                            TapstStorage.markScale = v; apply()
+                        }
+                    Image(systemName: TapstDesignKit.markSymbol(markShapeRaw))
+                        .font(.title3).foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("체크 표시 크기")
+            } footer: {
+                Text("잠금화면 카드의 완료 표시 크기를 글씨와 따로 조절해요.")
+            }
+
+            // Check-mark shape — available to everyone.
+            Section {
+                HStack(spacing: 12) {
+                    ForEach(TapstDesignKit.markShapes, id: \.id) { shape in
+                        Button {
+                            markShapeRaw = shape.id
+                            TapstStorage.markShapeRaw = shape.id
+                            apply()
+                        } label: {
+                            Image(systemName: shape.symbol)
+                                .font(.title2)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(markShapeRaw == shape.id
+                                              ? Color.accentColor.opacity(0.18)
+                                              : Color(.secondarySystemBackground))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .strokeBorder(markShapeRaw == shape.id ? Color.accentColor : .clear,
+                                                      lineWidth: 2)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.primary)
+                    }
+                }
+                .padding(.vertical, 6)
+            } header: {
+                Text("체크 모양")
+            } footer: {
+                Text("잠금화면 카드의 완료 표시 모양을 골라요.")
             }
 
             // Theme color — Pro.
@@ -131,9 +188,11 @@ struct DesignSettingsView: View {
 
     private var previewCard: some View {
         HStack(spacing: 14 * textScale) {
-            Circle()
-                .strokeBorder(TapstDesignKit.textColor(textColorID).opacity(0.85), lineWidth: 2.5)
-                .frame(width: 26 * textScale, height: 26 * textScale)
+            Image(systemName: TapstDesignKit.markSymbol(markShapeRaw))
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(TapstDesignKit.textColor(textColorID).opacity(0.85))
+                .frame(width: 26 * markScale, height: 26 * markScale)
             Text("메모 미리보기")
                 .font(TapstDesignKit.memoFont(fontDesign, size: 20 * textScale, bold: fontBold))
                 .foregroundStyle(TapstDesignKit.textColor(textColorID))
@@ -174,6 +233,8 @@ struct DesignSettingsView: View {
 
     private func reloadFromStorage() {
         textScale = TapstStorage.textScale
+        markScale = TapstStorage.markScale
+        markShapeRaw = TapstStorage.markShapeRaw
         themeColorID = TapstStorage.themeColorID
         textColorID = TapstStorage.textColorID
         fontDesign = TapstStorage.fontDesignRaw

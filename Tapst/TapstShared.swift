@@ -82,6 +82,21 @@ enum TapstDesignKit {
         default:         return .system(size: size, weight: bold ? .black : .semibold)
         }
     }
+
+    /// Completion-mark shapes for the Lock Screen card (hollow SF Symbols so any
+    /// shape keeps the original outlined look). Free for everyone (Basic).
+    static let markShapes: [(id: String, symbol: String, label: String)] = [
+        ("circle",  "circle",     "동그라미"),
+        ("square",  "square",     "네모"),
+        ("star",    "star",       "별"),
+        ("diamond", "diamond",    "마름모"),
+        ("heart",   "suit.heart", "하트")
+    ]
+
+    /// SF Symbol name for a mark shape id (falls back to the circle).
+    static func markSymbol(_ id: String) -> String {
+        markShapes.first { $0.id == id }?.symbol ?? "circle"
+    }
 }
 
 // MARK: - Timetable time formatting (shared with the widget)
@@ -154,6 +169,9 @@ struct TapstActivityAttributes: ActivityAttributes {
         var fontDesignRaw: String = "default"
         var fontBold: Bool = false
         var textScale: Double = 1.0
+        // Completion-mark size (independent of text) and shape. Free (Basic).
+        var markScale: Double = 1.0
+        var markShapeRaw: String = "circle"
         var limit: Int = 5
         var hideDynamicIsland: Bool = false
         // Which card the Lock Screen shows: "tasks" (default, free) or "schedule"
@@ -176,6 +194,8 @@ extension TapstActivityAttributes.ContentState {
             fontDesignRaw: TapstStorage.fontDesignRaw,
             fontBold: TapstStorage.fontBold,
             textScale: TapstStorage.textScale,
+            markScale: TapstStorage.markScale,
+            markShapeRaw: TapstStorage.markShapeRaw,
             limit: TapstStorage.lockScreenLimit,
             hideDynamicIsland: TapstStorage.hideDynamicIsland,
             mode: TapstStorage.lockScreenCardMode,
@@ -374,13 +394,28 @@ enum TapstStorage {
 
     // MARK: Appearance (Basic: text size / Pro: color + font)
 
-    /// Lock Screen card text/check scale. Available to everyone (Basic).
+    /// Lock Screen card text scale (text only). Available to everyone (Basic).
     static var textScale: Double {
         get {
             let v = defaults.double(forKey: "tapst.textScale")
             return v == 0 ? 1.0 : v
         }
         set { defaults.set(min(1.25, max(0.85, newValue)), forKey: "tapst.textScale") }
+    }
+
+    /// Lock Screen completion-mark scale, independent of text size. Free (Basic).
+    static var markScale: Double {
+        get {
+            let v = defaults.double(forKey: "tapst.markScale")
+            return v == 0 ? 1.0 : v
+        }
+        set { defaults.set(min(1.5, max(0.5, newValue)), forKey: "tapst.markScale") }
+    }
+
+    /// Lock Screen completion-mark shape id (see TapstDesignKit.markShapes). Free.
+    static var markShapeRaw: String {
+        get { defaults.string(forKey: "tapst.markShape") ?? "circle" }
+        set { defaults.set(newValue, forKey: "tapst.markShape") }
     }
 
     /// Theme (card) color id (Pro). Defaults to the free "graphite".

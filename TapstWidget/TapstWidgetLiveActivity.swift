@@ -31,9 +31,26 @@ struct TapstRowMetrics {
         }
     }
 
-    /// Applies the user's text-size preference (Basic feature).
-    func scaled(_ s: CGFloat) -> TapstRowMetrics {
-        TapstRowMetrics(text: text * s, ring: ring * s, gap: gap * s, spacing: spacing * s, vPadding: vPadding)
+    /// Applies the user's independent text-size and mark-size preferences (Basic).
+    /// Text/gap/spacing follow the text scale; only the ring follows the mark scale.
+    func scaled(text ts: CGFloat, mark ms: CGFloat) -> TapstRowMetrics {
+        TapstRowMetrics(text: text * ts, ring: ring * ms, gap: gap * ts, spacing: spacing * ts, vPadding: vPadding)
+    }
+}
+
+/// The completion mark as a hollow outline in the user's chosen shape, sized to
+/// `size`. Resizable so the outline (and its stroke) scale proportionally.
+struct TapstMarkView: View {
+    let shapeRaw: String
+    let size: CGFloat
+    let color: Color
+
+    var body: some View {
+        Image(systemName: TapstDesignKit.markSymbol(shapeRaw))
+            .resizable()
+            .scaledToFit()
+            .foregroundStyle(color)
+            .frame(width: size, height: size)
     }
 }
 
@@ -80,7 +97,9 @@ struct TapstChecklistView: View {
     private var cap: Int { max(1, state.limit) }
     private var overflow: Bool { count > cap }
     private var visibleCount: Int { min(count, cap) }
-    private var metrics: TapstRowMetrics { .forCount(min(count, cap)).scaled(CGFloat(state.textScale)) }
+    private var metrics: TapstRowMetrics {
+        .forCount(min(count, cap)).scaled(text: CGFloat(state.textScale), mark: CGFloat(state.markScale))
+    }
 
     private var textColor: Color { TapstDesignKit.textColor(state.textColorID) }
     private var memoFont: Font {
@@ -111,6 +130,7 @@ struct TapstChecklistView: View {
                         metrics: metrics,
                         font: memoFont,
                         textColor: textColor,
+                        markShape: state.markShapeRaw,
                         overflowBadge: (overflow && isLast) ? (count - visibleCount) : nil
                     )
                 }
@@ -123,9 +143,7 @@ struct TapstChecklistView: View {
 
     private var emptyRow: some View {
         HStack(spacing: metrics.gap) {
-            Circle()
-                .strokeBorder(textColor.opacity(0.5), lineWidth: 2.5)
-                .frame(width: metrics.ring, height: metrics.ring)
+            TapstMarkView(shapeRaw: state.markShapeRaw, size: metrics.ring, color: textColor.opacity(0.5))
             Text("뒷면을 탭해 추가하세요")
                 .font(memoFont)
                 .foregroundStyle(textColor.opacity(0.6))
@@ -227,14 +245,13 @@ struct TapstChecklistRow: View {
     let metrics: TapstRowMetrics
     let font: Font
     let textColor: Color
+    var markShape: String = "circle"
     var overflowBadge: Int? = nil
 
     var body: some View {
         HStack(spacing: metrics.gap) {
             Button(intent: CompleteTaskIntent(taskID: task.id.uuidString)) {
-                Circle()
-                    .strokeBorder(textColor.opacity(0.85), lineWidth: metrics.ring > 22 ? 2.5 : 2)
-                    .frame(width: metrics.ring, height: metrics.ring)
+                TapstMarkView(shapeRaw: markShape, size: metrics.ring, color: textColor.opacity(0.85))
             }
             .buttonStyle(.plain)
 
