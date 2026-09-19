@@ -181,6 +181,9 @@ struct TapstActivityAttributes: ActivityAttributes {
         // Screen. The widget filters by *today's* weekday so it flips at midnight.
         var schedule: [TapstScheduleItem] = []
         var scheduleWeekdays: [Int] = []
+        // Transient: task ids currently showing the "completed" checkmark just
+        // before they're removed, so tapping a row gives a visible "done" beat.
+        var completingIDs: [String] = []
     }
 }
 
@@ -515,6 +518,31 @@ enum TapstLiveActivity {
             }
         }
     }
+
+    /// Fast path for background adds (Back Tap / shortcut / control): updates the
+    /// existing card only. It never attempts `Activity.request`, which stalls or
+    /// fails from the background — that stall is what makes the system's shortcut
+    /// "running" (⏹) indicator linger. Returns almost instantly so the indicator
+    /// just flashes and the user can trigger the next capture right away.
+    /// The foreground app keeps a card alive (see `refresh()`), so one normally
+    /// exists; if it doesn't, the memo is still saved and appears on next launch.
+    static func updateExisting() async {
+        guard let activity = Activity<TapstActivityAttributes>.activities.first else { return }
+        let content = ActivityContent(
+            state: TapstActivityAttributes.ContentState.current(tasks: TapstStorage.load()),
+            staleDate: nil
+        )
+        await activity.update(content)
+    }
+
+    /// Flashes a checkmark on a single task's mark (without removing it yet) to
+    /// give a "done" beat before `CompleteTaskIntent` deletes it.
+    static func showCompleting(id: String) async {
+        guard let activity = Activity<TapstActivityAttributes>.activities.first else { return }
+        var state = TapstActivityAttributes.ContentState.current(tasks: TapstStorage.load())
+        state.completingIDs = [id]
+        await activity.update(ActivityContent(state: state, staleDate: nil))
+    }
 }
 
 // MARK: - Intents
@@ -540,7 +568,8 @@ struct AddTaskIntent: LiveActivityIntent {
     func perform() async throws -> some IntentResult {
         print("TAPST_LA: AddTaskIntent text=\"\(text)\"")
         TapstStorage.add(text)
-        await TapstLiveActivity.refresh()
+        // Fast update-only path keeps the shortcut run indicator brief.
+        await TapstLiveActivity.updateExisting()
         return .result()
     }
 }
@@ -561,6 +590,9 @@ struct CompleteTaskIntent: LiveActivityIntent {
 
     func perform() async throws -> some IntentResult {
         print("TAPST_LA: complete tap id=\(taskID)")
+        // 1) Flash a checkmark in the mark, 2) brief beat, 3) remove + refresh.
+        await TapstLiveActivity.showCompleting(id: taskID)
+        try? await Task.sleep(for: .milliseconds(450))
         TapstStorage.remove(id: taskID)
         await TapstLiveActivity.refresh()
         return .result()

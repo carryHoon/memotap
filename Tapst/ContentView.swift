@@ -161,6 +161,8 @@ struct ContentView: View {
         let text = draft
         draft = ""
         withAnimation(.snappy) { store.add(text) }
+        // Keep the keyboard up so the next memo can be typed with no delay.
+        inputFocused = true
     }
 }
 

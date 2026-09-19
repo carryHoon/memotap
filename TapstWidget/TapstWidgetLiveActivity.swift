@@ -131,6 +131,7 @@ struct TapstChecklistView: View {
                         font: memoFont,
                         textColor: textColor,
                         markShape: state.markShapeRaw,
+                        completing: state.completingIDs.contains(task.id.uuidString),
                         overflowBadge: (overflow && isLast) ? (count - visibleCount) : nil
                     )
                 }
@@ -246,12 +247,22 @@ struct TapstChecklistRow: View {
     let font: Font
     let textColor: Color
     var markShape: String = "circle"
+    var completing: Bool = false
     var overflowBadge: Int? = nil
 
     var body: some View {
         HStack(spacing: metrics.gap) {
             Button(intent: CompleteTaskIntent(taskID: task.id.uuidString)) {
-                TapstMarkView(shapeRaw: markShape, size: metrics.ring, color: textColor.opacity(0.85))
+                ZStack {
+                    TapstMarkView(shapeRaw: markShape, size: metrics.ring, color: textColor.opacity(0.85))
+                    if completing {
+                        // Brief "done" checkmark inside the mark before the row is removed.
+                        Image(systemName: "checkmark")
+                            .font(.system(size: metrics.ring * 0.62, weight: .bold))
+                            .foregroundStyle(textColor)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
             }
             .buttonStyle(.plain)
 
