@@ -519,22 +519,6 @@ enum TapstLiveActivity {
         }
     }
 
-    /// Fast path for background adds (Back Tap / shortcut / control): updates the
-    /// existing card only. It never attempts `Activity.request`, which stalls or
-    /// fails from the background — that stall is what makes the system's shortcut
-    /// "running" (⏹) indicator linger. Returns almost instantly so the indicator
-    /// just flashes and the user can trigger the next capture right away.
-    /// The foreground app keeps a card alive (see `refresh()`), so one normally
-    /// exists; if it doesn't, the memo is still saved and appears on next launch.
-    static func updateExisting() async {
-        guard let activity = Activity<TapstActivityAttributes>.activities.first else { return }
-        let content = ActivityContent(
-            state: TapstActivityAttributes.ContentState.current(tasks: TapstStorage.load()),
-            staleDate: nil
-        )
-        await activity.update(content)
-    }
-
     /// Flashes a checkmark on a single task's mark (without removing it yet) to
     /// give a "done" beat before `CompleteTaskIntent` deletes it.
     static func showCompleting(id: String) async {
@@ -568,8 +552,9 @@ struct AddTaskIntent: LiveActivityIntent {
     func perform() async throws -> some IntentResult {
         print("TAPST_LA: AddTaskIntent text=\"\(text)\"")
         TapstStorage.add(text)
-        // Fast update-only path keeps the shortcut run indicator brief.
-        await TapstLiveActivity.updateExisting()
+        // refresh() updates the existing card (fast) or creates one if none
+        // exists — a LiveActivityIntent can start the card from the Lock Screen.
+        await TapstLiveActivity.refresh()
         return .result()
     }
 }
