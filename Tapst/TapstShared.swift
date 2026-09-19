@@ -522,7 +522,7 @@ enum TapstLiveActivity {
 /// Captures a task without opening the app. Bound to Back Tap, the Lock Screen
 /// widget, and the Control Center / Lock Screen control.
 struct AddTaskIntent: LiveActivityIntent {
-    static var title: LocalizedStringResource = "Add memo"
+    static var title: LocalizedStringResource = "memotap"
     static var description = IntentDescription("Adds a memo and shows it on the Lock Screen.")
 
     /// LiveActivityIntent + background run: this is what lets it START the Live

@@ -8,6 +8,7 @@
 
 import SwiftUI
 import AVKit
+import UIKit
 
 /// The capture methods we provide a guide for.
 enum GuideTopic: String, Identifiable, CaseIterable {
@@ -66,12 +67,11 @@ enum GuideTopic: String, Identifiable, CaseIterable {
         switch self {
         case .tap:
             return [
-                String(localized: "단축어 앱에서 ‘+’를 클릭하고 ‘Add memo’를 추가해요."),
-                String(localized: "'설정 › 손쉬운 사용 › 터치 › 뒷면 탭 › 두 번 탭'에서 방금 만든 단축어 Add memo를 선택해요.")
+                String(localized: "'설정 › 손쉬운 사용 › 터치 › 뒷면 탭 › 두 번 탭'에서 'memotap'을 선택해요.")
             ]
         case .shortcut:
             return [
-                String(localized: "잠금화면을 길게 누르고 하단의 사용자화를 클릭해요."),
+                String(localized: "잠금화면을 길게 누르고 하단의 '사용자화'를 클릭해요."),
                 String(localized: "상단의 제어 항목 검색에서 ‘단축어 실행’을 입력 후 선택을 클릭해요."),
                 String(localized: "상단의 단축어 검색에서 ’메모탭’을 입력하고 '할 일 추가'를 선택해요. 우측 상단의 완료를 클릭해요.")
             ]
@@ -125,6 +125,7 @@ struct GuideListView: View {
 struct GuideDetailView: View {
     let topic: GuideTopic
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         VStack(spacing: 0) {
@@ -139,8 +140,17 @@ struct GuideDetailView: View {
                     demoVideo
 
                     VStack(spacing: 10) {
-                        ForEach(Array(topic.steps.enumerated()), id: \.offset) { index, step in
-                            GuideStepCard(number: index + 1, text: step)
+                        if topic == .tap {
+                            // Step 1 is a one-tap import of the ready-made shortcut,
+                            // replacing the old "build it yourself" instruction.
+                            shortcutImportStep
+                            ForEach(Array(topic.steps.enumerated()), id: \.offset) { index, step in
+                                GuideStepCard(number: index + 2, text: step)
+                            }
+                        } else {
+                            ForEach(Array(topic.steps.enumerated()), id: \.offset) { index, step in
+                                GuideStepCard(number: index + 1, text: step)
+                            }
                         }
                     }
                 }
@@ -169,6 +179,79 @@ struct GuideDetailView: View {
             markdown: topic.headline,
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         )) ?? AttributedString(topic.headline)
+    }
+
+    /// Prebuilt "할 일 추가" shortcut shared via iCloud. Tapping opens the import
+    /// sheet in the Shortcuts app; one "단축어 추가" tap saves it to "나의 단축어"
+    /// so it shows up in the Back Tap / Lock Screen shortcut list — no manual
+    /// building required.
+    private static let addMemoShortcutURL =
+        URL(string: "https://www.icloud.com/shortcuts/31dde7178a3b4ba9b93c1b85beab220b")!
+
+    /// Probe used to detect whether the (removable) Shortcuts app is installed.
+    /// Requires "shortcuts" in Info.plist ▸ LSApplicationQueriesSchemes.
+    private static let shortcutsProbeURL = URL(string: "shortcuts://")!
+
+    /// Apple's Shortcuts app on the App Store, opened when it isn't installed.
+    private static let shortcutsAppStoreURL = URL(string: "https://apps.apple.com/app/id915249334")!
+
+    /// Opens the ready-made shortcut import when Shortcuts is installed; otherwise
+    /// sends the user to install Shortcuts from the App Store first.
+    private func openShortcutImport() {
+        if UIApplication.shared.canOpenURL(Self.shortcutsProbeURL) {
+            openURL(Self.addMemoShortcutURL)
+        } else {
+            openURL(Self.shortcutsAppStoreURL)
+        }
+    }
+
+    /// Step 1 of the tap guide: a single tappable card (numbered like the other
+    /// steps) that imports the ready-made shortcut with one tap — styled like a
+    /// Shortcuts-app row (gradient glyph tile + label + chevron).
+    @ViewBuilder
+    private var shortcutImportStep: some View {
+        Button {
+            openShortcutImport()
+        } label: {
+            HStack(alignment: .center, spacing: 14) {
+                Text("1")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(Color(.systemBackground))
+                    .frame(width: 26, height: 26)
+                    .background(.primary, in: Circle())
+
+                Image(systemName: "square.2.layers.3d.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        LinearGradient(
+                            colors: [Color(red: 0.42, green: 0.31, blue: 0.90),
+                                     Color(red: 0.30, green: 0.55, blue: 0.98)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: RoundedRectangle(cornerRadius: 8)
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("단축어 추가하기")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Text("에서 '단축어 추가'를 클릭해요.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
